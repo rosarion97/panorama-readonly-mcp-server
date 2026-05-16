@@ -1,5 +1,6 @@
 .env
 .env.*
+.claude/
 *.key
 *.pem
 *.p12

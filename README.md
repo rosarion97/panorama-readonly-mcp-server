@@ -4,6 +4,18 @@ A Model Context Protocol (MCP) server that lets Claude query a **Palo Alto Netwo
 
 ---
 
+## Two Versions Available
+
+| Version | Location | Runtime | Secret storage |
+|---------|----------|---------|----------------|
+| **Docker** (this file) | `/` (root) | Docker Desktop + MCP Toolkit extension | `docker mcp secret set` |
+| **Podman** | [`/podman`](./podman) | Podman 4.4+ (rootless, no extension needed) | `podman secret create` |
+
+Both versions expose the same read-only tools. Choose the one that matches your container runtime.
+The Podman version includes additional input validation (XPath injection protection, type whitelists) and does not expose API key generation as a tool — the key is generated out of band with `curl`.
+
+---
+
 ## What It Does
 
 This server exposes 20+ read-only tools to Claude via MCP:
