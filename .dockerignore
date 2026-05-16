@@ -1,0 +1,12 @@
+.git
+.gitignore
+.env
+.env.*
+__pycache__
+*.pyc
+*.pyo
+.venv
+venv
+.DS_Store
+README.md
+custom-catalog.yaml
