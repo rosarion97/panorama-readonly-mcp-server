@@ -245,15 +245,15 @@ async def get_system_info(target_serial: str = "") -> str:
         )
         info = root.find(".//system")
         if info is None:
-            return "⚠️ No system info found in response"
-        lines = ["✅ System Information:"]
+            return "No system info found in response"
+        lines = ["System Information:"]
         for child in info:
             if child.text:
                 lines.append(f"  {child.tag}: {child.text}")
         return "\n".join(lines)
     except Exception as e:
         logger.error(f"Error in get_system_info: {e}")
-        return f"❌ Error: {str(e)}"
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
@@ -265,8 +265,8 @@ async def get_panorama_status() -> str:
         )
         info = root.find(".//system")
         if info is None:
-            return "⚠️ No system info found in response"
-        lines = ["✅ Panorama Status:"]
+            return "No system info found in response"
+        lines = ["Panorama Status:"]
         important_tags = [
             "hostname", "ip-address", "model", "serial", "sw-version",
             "operational-mode", "multi-vsys", "devicename",
@@ -282,7 +282,7 @@ async def get_panorama_status() -> str:
         return "\n".join(lines)
     except Exception as e:
         logger.error(f"Error in get_panorama_status: {e}")
-        return f"❌ Error: {str(e)}"
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
@@ -296,15 +296,15 @@ async def list_managed_devices(connected_only: str = "no") -> str:
         root = await _panorama_request({"type": "op", "cmd": cmd})
         entries = root.findall(".//devices/entry") or root.findall(".//entry")
         if not entries:
-            return "⚠️ No managed devices found"
-        lines = [f"✅ Managed Devices ({len(entries)} found):"]
+            return "No managed devices found"
+        lines = [f"Managed Devices ({len(entries)} found):"]
         for entry in entries:
             lines.append(_format_device_entry(entry))
             lines.append("  ---")
         return "\n".join(lines)
     except Exception as e:
         logger.error(f"Error in list_managed_devices: {e}")
-        return f"❌ Error: {str(e)}"
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
@@ -316,8 +316,8 @@ async def get_device_groups() -> str:
         )
         entries = root.findall(".//devicegroups/entry") or root.findall(".//entry")
         if not entries:
-            return "⚠️ No device groups found"
-        lines = ["✅ Device Groups:"]
+            return "No device groups found"
+        lines = ["Device Groups:"]
         for entry in entries:
             name = entry.attrib.get("name", "N/A")
             lines.append(f"\n  Device Group: {name}")
@@ -335,7 +335,7 @@ async def get_device_groups() -> str:
         return "\n".join(lines)
     except Exception as e:
         logger.error(f"Error in get_device_groups: {e}")
-        return f"❌ Error: {str(e)}"
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
@@ -347,8 +347,8 @@ async def get_templates() -> str:
         )
         entries = root.findall(".//templates/entry") or root.findall(".//entry")
         if not entries:
-            return "⚠️ No templates found"
-        lines = ["✅ Templates:"]
+            return "No templates found"
+        lines = ["Templates:"]
         for entry in entries:
             name = entry.attrib.get("name", "N/A")
             lines.append(f"\n  Template: {name}")
@@ -360,7 +360,7 @@ async def get_templates() -> str:
         return "\n".join(lines)
     except Exception as e:
         logger.error(f"Error in get_templates: {e}")
-        return f"❌ Error: {str(e)}"
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
@@ -375,10 +375,10 @@ async def get_running_config(xpath: str, target_serial: str = "") -> str:
         result = root.find(".//result")
         if result is None:
             result = root
-        return f"✅ Running Config ({xp}):\n{_xml_to_text(result)}"
+        return f"Running Config ({xp}):\n{_xml_to_text(result)}"
     except Exception as e:
         logger.error(f"Error in get_running_config: {e}")
-        return f"❌ Error: {str(e)}"
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
@@ -393,10 +393,10 @@ async def get_candidate_config(xpath: str, target_serial: str = "") -> str:
         result = root.find(".//result")
         if result is None:
             result = root
-        return f"✅ Candidate Config ({xp}):\n{_xml_to_text(result)}"
+        return f"Candidate Config ({xp}):\n{_xml_to_text(result)}"
     except Exception as e:
         logger.error(f"Error in get_candidate_config: {e}")
-        return f"❌ Error: {str(e)}"
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
@@ -413,22 +413,22 @@ async def get_security_rules(device_group: str = "", rule_type: str = "pre", tar
         elif target_serial.strip():
             xpath = "/config/devices/entry/vsys/entry[@name='vsys1']/rulebase/security/rules"
         else:
-            return "❌ Error: Provide either device_group or target_serial"
+            return "Error: Provide either device_group or target_serial"
         root = await _panorama_request(
             {"type": "config", "action": "show", "xpath": xpath},
             target_serial,
         )
         entries = root.findall(".//rules/entry") or root.findall(".//entry")
         if not entries:
-            return "⚠️ No security rules found"
-        lines = [f"✅ Security Rules ({len(entries)} found):"]
+            return "No security rules found"
+        lines = [f"Security Rules ({len(entries)} found):"]
         for entry in entries:
             lines.append(_format_rule_entry(entry))
             lines.append("  ---")
         return "\n".join(lines)
     except Exception as e:
         logger.error(f"Error in get_security_rules: {e}")
-        return f"❌ Error: {str(e)}"
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
@@ -445,22 +445,22 @@ async def get_nat_rules(device_group: str = "", rule_type: str = "pre", target_s
         elif target_serial.strip():
             xpath = "/config/devices/entry/vsys/entry[@name='vsys1']/rulebase/nat/rules"
         else:
-            return "❌ Error: Provide either device_group or target_serial"
+            return "Error: Provide either device_group or target_serial"
         root = await _panorama_request(
             {"type": "config", "action": "show", "xpath": xpath},
             target_serial,
         )
         entries = root.findall(".//rules/entry") or root.findall(".//entry")
         if not entries:
-            return "⚠️ No NAT rules found"
-        lines = [f"✅ NAT Rules ({len(entries)} found):"]
+            return "No NAT rules found"
+        lines = [f"NAT Rules ({len(entries)} found):"]
         for entry in entries:
             lines.append(_format_rule_entry(entry))
             lines.append("  ---")
         return "\n".join(lines)
     except Exception as e:
         logger.error(f"Error in get_nat_rules: {e}")
-        return f"❌ Error: {str(e)}"
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
@@ -480,8 +480,8 @@ async def get_address_objects(location: str = "shared", target_serial: str = "")
         )
         entries = root.findall(".//address/entry") or root.findall(".//entry")
         if not entries:
-            return "⚠️ No address objects found"
-        lines = [f"✅ Address Objects ({len(entries)} found):"]
+            return "No address objects found"
+        lines = [f"Address Objects ({len(entries)} found):"]
         for entry in entries:
             name = entry.attrib.get("name", "N/A")
             value = ""
@@ -496,7 +496,7 @@ async def get_address_objects(location: str = "shared", target_serial: str = "")
         return "\n".join(lines)
     except Exception as e:
         logger.error(f"Error in get_address_objects: {e}")
-        return f"❌ Error: {str(e)}"
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
@@ -516,8 +516,8 @@ async def get_address_groups(location: str = "shared", target_serial: str = "") 
         )
         entries = root.findall(".//address-group/entry") or root.findall(".//entry")
         if not entries:
-            return "⚠️ No address groups found"
-        lines = [f"✅ Address Groups ({len(entries)} found):"]
+            return "No address groups found"
+        lines = [f"Address Groups ({len(entries)} found):"]
         for entry in entries:
             name = entry.attrib.get("name", "N/A")
             static_members = entry.findall("static/member")
@@ -532,7 +532,7 @@ async def get_address_groups(location: str = "shared", target_serial: str = "") 
         return "\n".join(lines)
     except Exception as e:
         logger.error(f"Error in get_address_groups: {e}")
-        return f"❌ Error: {str(e)}"
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
@@ -552,8 +552,8 @@ async def get_service_objects(location: str = "shared", target_serial: str = "")
         )
         entries = root.findall(".//service/entry") or root.findall(".//entry")
         if not entries:
-            return "⚠️ No service objects found"
-        lines = [f"✅ Service Objects ({len(entries)} found):"]
+            return "No service objects found"
+        lines = [f"Service Objects ({len(entries)} found):"]
         for entry in entries:
             name = entry.attrib.get("name", "N/A")
             parts = []
@@ -572,7 +572,7 @@ async def get_service_objects(location: str = "shared", target_serial: str = "")
         return "\n".join(lines)
     except Exception as e:
         logger.error(f"Error in get_service_objects: {e}")
-        return f"❌ Error: {str(e)}"
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
@@ -581,7 +581,7 @@ async def get_security_profiles(profile_type: str, location: str = "shared") -> 
     try:
         pt = profile_type.strip()
         if pt not in ALLOWED_PROFILE_TYPES:
-            return f"❌ Error: profile_type must be one of: {', '.join(sorted(ALLOWED_PROFILE_TYPES))}"
+            return f"Error: profile_type must be one of: {', '.join(sorted(ALLOWED_PROFILE_TYPES))}"
         if location.strip().lower() == "shared":
             xpath = f"/config/shared/profiles/{pt}"
         else:
@@ -593,19 +593,19 @@ async def get_security_profiles(profile_type: str, location: str = "shared") -> 
         result = root.find(".//result")
         if result is None:
             result = root
-        return f"✅ Security Profiles ({pt}):\n{_xml_to_text(result)}"
+        return f"Security Profiles ({pt}):\n{_xml_to_text(result)}"
     except Exception as e:
         logger.error(f"Error in get_security_profiles: {e}")
-        return f"❌ Error: {str(e)}"
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
 async def run_show_command(cmd_xml: str, target_serial: str = "") -> str:
     """Run any read-only operational 'show' command on Panorama or a managed firewall (cmd must start with <show>)."""
     if not cmd_xml.strip():
-        return "❌ Error: cmd_xml is required"
+        return "Error: cmd_xml is required"
     if not _validate_readonly_op(cmd_xml):
-        return "❌ Error: Only read-only 'show' commands are allowed. The command must start with '<show>' and cannot contain blocked operations."
+        return "Error: Only read-only 'show' commands are allowed. The command must start with '<show>' and cannot contain blocked operations."
     try:
         root = await _panorama_request(
             {"type": "op", "cmd": cmd_xml.strip()},
@@ -614,17 +614,17 @@ async def run_show_command(cmd_xml: str, target_serial: str = "") -> str:
         result = root.find(".//result")
         if result is None:
             result = root
-        return f"✅ Command Output:\n{_xml_to_text(result)}"
+        return f"Command Output:\n{_xml_to_text(result)}"
     except Exception as e:
         logger.error(f"Error in run_show_command: {e}")
-        return f"❌ Error: {str(e)}"
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
 async def get_logs(log_type: str, query: str = "", nlogs: str = "20", skip: str = "0", direction: str = "backward") -> str:
     """Retrieve logs from Panorama (traffic, threat, url, wildfire, config, system, globalprotect, etc.)."""
     if not log_type.strip():
-        return "❌ Error: log_type is required (traffic, threat, url, wildfire, data, config, system, globalprotect, hipmatch, auth, decryption, userid, iptag)"
+        return "Error: log_type is required (traffic, threat, url, wildfire, data, config, system, globalprotect, hipmatch, auth, decryption, userid, iptag)"
     try:
         params = {
             "type": "log",
@@ -640,7 +640,7 @@ async def get_logs(log_type: str, query: str = "", nlogs: str = "20", skip: str 
         root = await _panorama_request(params)
         job_el = root.find(".//job")
         if job_el is None or not job_el.text:
-            return "❌ Error: No job ID returned from log query"
+            return "Error: No job ID returned from log query"
 
         job_id = job_el.text
         logger.info(f"Log query job initiated: {job_id}")
@@ -654,10 +654,10 @@ async def get_logs(log_type: str, query: str = "", nlogs: str = "20", skip: str 
             count_el = result_root.find(".//logs")
             count = count_el.attrib.get("count", "0") if count_el is not None else "0"
             if count == "0":
-                return f"⚠️ No {log_type} logs found matching the query"
-            return f"✅ Log query completed but no entries parsed. Raw:\n{_xml_to_text(result_root)}"
+                return f"No {log_type} logs found matching the query"
+            return f"Log query completed but no entries parsed. Raw:\n{_xml_to_text(result_root)}"
 
-        lines = [f"✅ {log_type.capitalize()} Logs ({len(log_entries)} entries):"]
+        lines = [f"{log_type.capitalize()} Logs ({len(log_entries)} entries):"]
         for entry in log_entries:
             lines.append("")
             for child in entry:
@@ -667,14 +667,14 @@ async def get_logs(log_type: str, query: str = "", nlogs: str = "20", skip: str 
         return "\n".join(lines)
     except Exception as e:
         logger.error(f"Error in get_logs: {e}")
-        return f"❌ Error: {str(e)}"
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
 async def get_report(report_type: str, report_name: str = "", period: str = "last-24-hrs", topn: str = "10") -> str:
     """Retrieve predefined, dynamic, or custom reports from Panorama."""
     if not report_type.strip():
-        return "❌ Error: report_type is required (predefined, dynamic, custom)"
+        return "Error: report_type is required (predefined, dynamic, custom)"
     try:
         params = {
             "type": "report",
@@ -692,7 +692,7 @@ async def get_report(report_type: str, report_name: str = "", period: str = "las
             result = root.find(".//result")
             if result is None:
                 result = root
-            return f"✅ Available {report_type} reports:\n{_xml_to_text(result)}"
+            return f"Available {report_type} reports:\n{_xml_to_text(result)}"
 
         # Initiate report job
         root = await _panorama_request(params)
@@ -702,7 +702,7 @@ async def get_report(report_type: str, report_name: str = "", period: str = "las
             result = root.find(".//result")
             if result is None:
                 result = root
-            return f"✅ Report ({report_name}):\n{_xml_to_text(result)}"
+            return f"Report ({report_name}):\n{_xml_to_text(result)}"
 
         job_id = job_el.text
         logger.info(f"Report job initiated: {job_id}")
@@ -712,10 +712,10 @@ async def get_report(report_type: str, report_name: str = "", period: str = "las
         result = result_root.find(".//result") or result_root.find(".//report")
         if result is None:
             result = result_root
-        return f"✅ Report ({report_name}):\n{_xml_to_text(result)}"
+        return f"Report ({report_name}):\n{_xml_to_text(result)}"
     except Exception as e:
         logger.error(f"Error in get_report: {e}")
-        return f"❌ Error: {str(e)}"
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
@@ -724,7 +724,7 @@ async def get_predefined_objects(object_type: str, name_filter: str = "") -> str
     try:
         ot = object_type.strip()
         if ot not in ALLOWED_PREDEFINED_TYPES:
-            return f"❌ Error: object_type must be one of: {', '.join(sorted(ALLOWED_PREDEFINED_TYPES))}"
+            return f"Error: object_type must be one of: {', '.join(sorted(ALLOWED_PREDEFINED_TYPES))}"
         if name_filter.strip():
             nf = _validate_name(name_filter, "name_filter")
             xpath = f"/config/predefined/{ot}/entry[@name='{nf}']"
@@ -739,7 +739,7 @@ async def get_predefined_objects(object_type: str, name_filter: str = "") -> str
         # For large results, try to summarize
         entries = result.findall(".//entry")
         if entries and len(entries) > 50 and not name_filter.strip():
-            lines = [f"✅ Predefined {ot} ({len(entries)} objects). Showing first 50:"]
+            lines = [f"Predefined {ot} ({len(entries)} objects). Showing first 50:"]
             for entry in entries[:50]:
                 name = entry.attrib.get("name", "N/A")
                 desc_el = entry.find("description")
@@ -747,10 +747,10 @@ async def get_predefined_objects(object_type: str, name_filter: str = "") -> str
                 lines.append(f"  {name}{desc}")
             lines.append(f"\n  ... and {len(entries) - 50} more. Use name_filter to look up specific objects.")
             return "\n".join(lines)
-        return f"✅ Predefined {ot}:\n{_xml_to_text(result)}"
+        return f"Predefined {ot}:\n{_xml_to_text(result)}"
     except Exception as e:
         logger.error(f"Error in get_predefined_objects: {e}")
-        return f"❌ Error: {str(e)}"
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
@@ -764,17 +764,17 @@ async def get_ha_status(target_serial: str = "") -> str:
         result = root.find(".//result")
         if result is None:
             result = root
-        return f"✅ HA Status:\n{_xml_to_text(result)}"
+        return f"HA Status:\n{_xml_to_text(result)}"
     except Exception as e:
         logger.error(f"Error in get_ha_status: {e}")
-        return f"❌ Error: {str(e)}"
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
 async def get_job_status(job_id: str, target_serial: str = "") -> str:
     """Check the status of an asynchronous job by its ID."""
     if not job_id.strip():
-        return "❌ Error: job_id is required"
+        return "Error: job_id is required"
     try:
         root = await _panorama_request(
             {"type": "op", "cmd": f"<show><jobs><id>{job_id.strip()}</id></jobs></show>"},
@@ -783,10 +783,10 @@ async def get_job_status(job_id: str, target_serial: str = "") -> str:
         result = root.find(".//result") or root.find(".//job")
         if result is None:
             result = root
-        return f"✅ Job {job_id} Status:\n{_xml_to_text(result)}"
+        return f"Job {job_id} Status:\n{_xml_to_text(result)}"
     except Exception as e:
         logger.error(f"Error in get_job_status: {e}")
-        return f"❌ Error: {str(e)}"
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
@@ -805,17 +805,17 @@ async def export_device_state(target_serial: str = "") -> str:
         if config is not None:
             children = list(config)
             if len(children) > 0:
-                lines = ["✅ Configuration Export (top-level structure):"]
+                lines = ["Configuration Export (top-level structure):"]
                 for child in children:
                     count = len(list(child))
                     lines.append(f"  {child.tag} ({count} sub-elements)")
                 lines.append(f"\nFull config is {len(ET.tostring(config, encoding='unicode'))} characters.")
                 lines.append("Use get_running_config with a specific xpath to drill into sections.")
                 return "\n".join(lines)
-        return f"✅ Configuration Export:\n{_xml_to_text(result)}"
+        return f"Configuration Export:\n{_xml_to_text(result)}"
     except Exception as e:
         logger.error(f"Error in export_device_state: {e}")
-        return f"❌ Error: {str(e)}"
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
@@ -831,11 +831,11 @@ async def get_config_audit(target_serial: str = "") -> str:
             result = root
         text = _xml_to_text(result)
         if not text.strip() or text.strip() == "result":
-            return "✅ No uncommitted changes detected"
-        return f"✅ Configuration Changes:\n{text}"
+            return "No uncommitted changes detected"
+        return f"Configuration Changes:\n{text}"
     except Exception as e:
         logger.error(f"Error in get_config_audit: {e}")
-        return f"❌ Error: {str(e)}"
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
@@ -851,14 +851,14 @@ async def get_commit_locks(target_serial: str = "") -> str:
             result = root
         entries = result.findall(".//entry")
         if not entries:
-            return "✅ No active commit locks"
-        lines = ["✅ Active Commit Locks:"]
+            return "No active commit locks"
+        lines = ["Active Commit Locks:"]
         for entry in entries:
             lines.append(_xml_to_text(entry, 1))
         return "\n".join(lines)
     except Exception as e:
         logger.error(f"Error in get_commit_locks: {e}")
-        return f"❌ Error: {str(e)}"
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
@@ -872,16 +872,16 @@ async def get_version_info(target_serial: str = "") -> str:
         result = root.find(".//result")
         if result is None:
             result = root
-        lines = ["✅ Version Information:"]
+        lines = ["Version Information:"]
         for child in result:
             if child.text:
                 lines.append(f"  {child.tag}: {child.text}")
         if len(lines) == 1:
-            return f"✅ Version Info:\n{_xml_to_text(result)}"
+            return f"Version Info:\n{_xml_to_text(result)}"
         return "\n".join(lines)
     except Exception as e:
         logger.error(f"Error in get_version_info: {e}")
-        return f"❌ Error: {str(e)}"
+        return f"Error: {str(e)}"
 
 
 # ---------------------------------------------------------------------------
