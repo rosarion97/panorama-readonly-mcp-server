@@ -2,8 +2,7 @@ version: "2"
 registry:
   panorama-readonly:
     name: Panorama Read-Only
-    description: Query a Palo Alto Networks Panorama management server in read-only mode using the PAN-OS XML API. Retrieve system info, managed devices, security policies, logs, reports, and more — without making any configuration changes.
-    icon: https://www.paloaltonetworks.com/content/dam/pan/en_US/images/logos/brand/primary-company-logo/Parent-Logo.svg
+    description: Query a Palo Alto Networks Panorama management server in read-only mode using the PAN-OS XML API. Retrieve system info, managed devices, security policies, logs, reports, and more — without making any configuration changes. Not affiliated with or endorsed by Palo Alto Networks.
     categories:
       - security
       - network
@@ -15,7 +14,7 @@ registry:
         description: Hostname or IP of the Panorama management server
       - name: PANORAMA_API_KEY
         required: true
-        description: PAN-OS API key (generate via type=keygen)
+        description: PAN-OS API key (generate out of band via curl with type=keygen)
       - name: PANORAMA_VERIFY_SSL
         required: false
-        description: Set to "no" to disable TLS certificate verification (for self-signed certs)
+        description: TLS verification — "yes" (default) for production, "no" only for self-signed lab certs

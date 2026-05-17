@@ -2,6 +2,7 @@
 """Panorama Read-Only MCP Server — Query Palo Alto Networks Panorama via the PAN-OS XML API."""
 
 import os
+import re
 import sys
 import signal
 import logging
@@ -58,6 +59,54 @@ def _validate_readonly_op(cmd_xml: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Safety — XPath input validation
+# ---------------------------------------------------------------------------
+# Names embedded inside XPath attribute values are validated against this
+# pattern to prevent breakouts (single quotes, slashes, brackets, etc.).
+# PAN-OS object names allow letters, digits, underscore, dot, hyphen, and
+# spaces. Anything else is rejected.
+_XPATH_NAME_RE = re.compile(r"^[A-Za-z0-9_.\- ]+$")
+
+ALLOWED_PROFILE_TYPES = {
+    "virus", "spyware", "vulnerability", "url-filtering",
+    "file-blocking", "wildfire-analysis", "data-filtering",
+    "dns-security",
+}
+
+ALLOWED_PREDEFINED_TYPES = {
+    "application", "service", "application-tag",
+    "threats/vulnerability", "threats/spyware",
+}
+
+
+def _validate_name(value: str, label: str) -> str:
+    """Strip and validate a value embedded inside an XPath attribute. Raise ValueError on rejection."""
+    name = value.strip()
+    if not name:
+        raise ValueError(f"{label} is required")
+    if len(name) > 128:
+        raise ValueError(f"{label} is too long (max 128 chars)")
+    if not _XPATH_NAME_RE.match(name):
+        raise ValueError(
+            f"{label} contains invalid characters "
+            f"(allowed: letters, digits, underscore, dot, hyphen, space)"
+        )
+    return name
+
+
+def _validate_xpath(xpath: str) -> str:
+    """Lightweight check for raw XPath input — must start with /config and stay short of pathological lengths."""
+    xp = xpath.strip()
+    if not xp:
+        raise ValueError("xpath is required")
+    if not xp.startswith("/config"):
+        raise ValueError("xpath must start with /config")
+    if len(xp) > 1024:
+        raise ValueError("xpath is too long (max 1024 chars)")
+    return xp
+
+
+# ---------------------------------------------------------------------------
 # Shared helper — make a read-only XML API request to Panorama
 # ---------------------------------------------------------------------------
 
@@ -78,7 +127,8 @@ async def _panorama_request(params: dict, target_serial: str = "") -> ET.Element
     if target_serial.strip():
         params["target"] = target_serial.strip()
 
-    async with httpx.AsyncClient(verify=verify_ssl, timeout=60) as client:
+    timeout = httpx.Timeout(connect=10.0, read=60.0, write=10.0, pool=10.0)
+    async with httpx.AsyncClient(verify=verify_ssl, timeout=timeout) as client:
         try:
             response = await client.post(url, params=params, headers=headers)
             response.raise_for_status()
@@ -86,47 +136,20 @@ async def _panorama_request(params: dict, target_serial: str = "") -> ET.Element
             status = root.attrib.get("status", "")
             if status != "success":
                 msg_el = root.find(".//msg") or root.find(".//line")
-                msg = msg_el.text if msg_el is not None and msg_el.text else response.text[:500]
+                msg = msg_el.text if msg_el is not None and msg_el.text else "request rejected"
                 raise ValueError(f"PAN-OS API error: {msg}")
             return root
         except httpx.HTTPStatusError as e:
-            raise ValueError(f"HTTP {e.response.status_code}: {e.response.text[:300]}")
+            code = e.response.status_code
+            if code in (401, 403):
+                raise ValueError(f"HTTP {code}: authentication failed (check PANORAMA_API_KEY and admin role)")
+            raise ValueError(f"HTTP {code}: request failed")
         except httpx.ConnectError:
             raise ValueError(f"Could not connect to Panorama at {host}")
+        except httpx.TimeoutException:
+            raise ValueError("Timed out waiting for Panorama response")
         except ET.ParseError:
-            raise ValueError(f"Failed to parse XML response from Panorama")
-
-
-# ---------------------------------------------------------------------------
-# Shared helper — make a keygen request (no API key required)
-# ---------------------------------------------------------------------------
-
-async def _panorama_keygen(username: str, password: str) -> ET.Element:
-    """Generate an API key using admin credentials."""
-    host = os.environ.get("PANORAMA_HOST", "").strip()
-    verify_ssl = os.environ.get("PANORAMA_VERIFY_SSL", "yes").strip().lower() != "no"
-
-    if not host:
-        raise ValueError("PANORAMA_HOST environment variable is not set")
-
-    url = f"https://{host}/api/"
-    data = {"user": username, "password": password}
-
-    async with httpx.AsyncClient(verify=verify_ssl, timeout=30) as client:
-        try:
-            response = await client.post(url, params={"type": "keygen"}, data=data)
-            response.raise_for_status()
-            root = ET.fromstring(response.text)
-            status = root.attrib.get("status", "")
-            if status != "success":
-                msg_el = root.find(".//msg") or root.find(".//line")
-                msg = msg_el.text if msg_el is not None and msg_el.text else response.text[:500]
-                raise ValueError(f"Keygen error: {msg}")
-            return root
-        except httpx.HTTPStatusError as e:
-            raise ValueError(f"HTTP {e.response.status_code}: {e.response.text[:300]}")
-        except httpx.ConnectError:
-            raise ValueError(f"Could not connect to Panorama at {host}")
+            raise ValueError("Failed to parse XML response from Panorama")
 
 
 # ---------------------------------------------------------------------------
@@ -139,13 +162,8 @@ async def _poll_job(job_id: str, job_type: str = "log", target_serial: str = "",
     while elapsed < timeout:
         params = {"type": job_type, "action": "get", "job-id": job_id}
         root = await _panorama_request(params, target_serial)
-        # Check for FIN status in various possible locations
         status_el = root.find(".//job/status") or root.find(".//status")
         if status_el is not None and status_el.text == "FIN":
-            return root
-        # Also check progress element for completion
-        progress_el = root.find(".//job/progress")
-        if progress_el is not None and progress_el.text == "100":
             return root
         await asyncio.sleep(2)
         elapsed += 2
@@ -216,24 +234,6 @@ def _format_rule_entry(entry: ET.Element) -> str:
 # ===========================================================================
 # TOOLS
 # ===========================================================================
-
-@mcp.tool()
-async def generate_api_key(username: str, password: str) -> str:
-    """Generate a PAN-OS API key using admin credentials for subsequent requests."""
-    if not username.strip():
-        return "Error: username is required"
-    if not password.strip():
-        return "Error: password is required"
-    try:
-        root = await _panorama_keygen(username, password)
-        key_el = root.find(".//key")
-        if key_el is not None and key_el.text:
-            return f"API Key generated successfully:\n{key_el.text}\n\nStore this key as the PANORAMA_API_KEY environment variable."
-        return "Error: No key element found in response"
-    except Exception as e:
-        logger.error(f"Error in generate_api_key: {e}")
-        return f"Error: {str(e)}"
-
 
 @mcp.tool()
 async def get_system_info(target_serial: str = "") -> str:
@@ -365,18 +365,17 @@ async def get_templates() -> str:
 
 @mcp.tool()
 async def get_running_config(xpath: str, target_serial: str = "") -> str:
-    """Retrieve the active (running) configuration for a specific XPath on Panorama or a managed firewall."""
-    if not xpath.strip():
-        return "Error: xpath is required"
+    """Retrieve the active (running) configuration for a specific XPath (must start with /config)."""
     try:
+        xp = _validate_xpath(xpath)
         root = await _panorama_request(
-            {"type": "config", "action": "show", "xpath": xpath.strip()},
+            {"type": "config", "action": "show", "xpath": xp},
             target_serial,
         )
         result = root.find(".//result")
         if result is None:
             result = root
-        return f"Running Config ({xpath}):\n{_xml_to_text(result)}"
+        return f"Running Config ({xp}):\n{_xml_to_text(result)}"
     except Exception as e:
         logger.error(f"Error in get_running_config: {e}")
         return f"Error: {str(e)}"
@@ -384,18 +383,17 @@ async def get_running_config(xpath: str, target_serial: str = "") -> str:
 
 @mcp.tool()
 async def get_candidate_config(xpath: str, target_serial: str = "") -> str:
-    """Retrieve the candidate (uncommitted) configuration for a specific XPath."""
-    if not xpath.strip():
-        return "Error: xpath is required"
+    """Retrieve the candidate (uncommitted) configuration for a specific XPath (must start with /config)."""
     try:
+        xp = _validate_xpath(xpath)
         root = await _panorama_request(
-            {"type": "config", "action": "get", "xpath": xpath.strip()},
+            {"type": "config", "action": "get", "xpath": xp},
             target_serial,
         )
         result = root.find(".//result")
         if result is None:
             result = root
-        return f"Candidate Config ({xpath}):\n{_xml_to_text(result)}"
+        return f"Candidate Config ({xp}):\n{_xml_to_text(result)}"
     except Exception as e:
         logger.error(f"Error in get_candidate_config: {e}")
         return f"Error: {str(e)}"
@@ -406,7 +404,7 @@ async def get_security_rules(device_group: str = "", rule_type: str = "pre", tar
     """Retrieve security policy rules from a device group (pre/post rules) or from a managed firewall."""
     try:
         if device_group.strip():
-            dg = device_group.strip()
+            dg = _validate_name(device_group, "device_group")
             rt = "pre-rulebase" if rule_type.strip().lower() == "pre" else "post-rulebase"
             xpath = (
                 f"/config/devices/entry[@name='localhost.localdomain']"
@@ -438,7 +436,7 @@ async def get_nat_rules(device_group: str = "", rule_type: str = "pre", target_s
     """Retrieve NAT policy rules from a device group or managed firewall."""
     try:
         if device_group.strip():
-            dg = device_group.strip()
+            dg = _validate_name(device_group, "device_group")
             rt = "pre-rulebase" if rule_type.strip().lower() == "pre" else "post-rulebase"
             xpath = (
                 f"/config/devices/entry[@name='localhost.localdomain']"
@@ -474,7 +472,7 @@ async def get_address_objects(location: str = "shared", target_serial: str = "")
         elif location.strip().lower() == "shared":
             xpath = "/config/shared/address"
         else:
-            dg = location.strip()
+            dg = _validate_name(location, "location")
             xpath = f"/config/devices/entry[@name='localhost.localdomain']/device-group/entry[@name='{dg}']/address"
         root = await _panorama_request(
             {"type": "config", "action": "show", "xpath": xpath},
@@ -510,7 +508,7 @@ async def get_address_groups(location: str = "shared", target_serial: str = "") 
         elif location.strip().lower() == "shared":
             xpath = "/config/shared/address-group"
         else:
-            dg = location.strip()
+            dg = _validate_name(location, "location")
             xpath = f"/config/devices/entry[@name='localhost.localdomain']/device-group/entry[@name='{dg}']/address-group"
         root = await _panorama_request(
             {"type": "config", "action": "show", "xpath": xpath},
@@ -546,7 +544,7 @@ async def get_service_objects(location: str = "shared", target_serial: str = "")
         elif location.strip().lower() == "shared":
             xpath = "/config/shared/service"
         else:
-            dg = location.strip()
+            dg = _validate_name(location, "location")
             xpath = f"/config/devices/entry[@name='localhost.localdomain']/device-group/entry[@name='{dg}']/service"
         root = await _panorama_request(
             {"type": "config", "action": "show", "xpath": xpath},
@@ -579,15 +577,15 @@ async def get_service_objects(location: str = "shared", target_serial: str = "")
 
 @mcp.tool()
 async def get_security_profiles(profile_type: str, location: str = "shared") -> str:
-    """Retrieve security profile configs (virus, spyware, vulnerability, url-filtering, file-blocking, wildfire-analysis)."""
-    if not profile_type.strip():
-        return "Error: profile_type is required (virus, spyware, vulnerability, url-filtering, file-blocking, wildfire-analysis)"
+    """Retrieve security profile configs (virus, spyware, vulnerability, url-filtering, file-blocking, wildfire-analysis, data-filtering, dns-security)."""
     try:
         pt = profile_type.strip()
+        if pt not in ALLOWED_PROFILE_TYPES:
+            return f"Error: profile_type must be one of: {', '.join(sorted(ALLOWED_PROFILE_TYPES))}"
         if location.strip().lower() == "shared":
             xpath = f"/config/shared/profiles/{pt}"
         else:
-            dg = location.strip()
+            dg = _validate_name(location, "location")
             xpath = f"/config/devices/entry[@name='localhost.localdomain']/device-group/entry[@name='{dg}']/profiles/{pt}"
         root = await _panorama_request(
             {"type": "config", "action": "show", "xpath": xpath}
@@ -722,13 +720,14 @@ async def get_report(report_type: str, report_name: str = "", period: str = "las
 
 @mcp.tool()
 async def get_predefined_objects(object_type: str, name_filter: str = "") -> str:
-    """Retrieve predefined PAN-OS objects like applications, services, or threats/vulnerability."""
-    if not object_type.strip():
-        return "Error: object_type is required (application, service, threats/vulnerability)"
+    """Retrieve predefined PAN-OS objects (application, service, application-tag, threats/vulnerability, threats/spyware)."""
     try:
         ot = object_type.strip()
+        if ot not in ALLOWED_PREDEFINED_TYPES:
+            return f"Error: object_type must be one of: {', '.join(sorted(ALLOWED_PREDEFINED_TYPES))}"
         if name_filter.strip():
-            xpath = f"/config/predefined/{ot}/entry[@name='{name_filter.strip()}']"
+            nf = _validate_name(name_filter, "name_filter")
+            xpath = f"/config/predefined/{ot}/entry[@name='{nf}']"
         else:
             xpath = f"/config/predefined/{ot}"
         root = await _panorama_request(
@@ -909,7 +908,7 @@ def _startup_checks():
     if not host:
         logger.warning("PANORAMA_HOST is not set — tools will fail until it is configured")
     if not api_key:
-        logger.warning("PANORAMA_API_KEY is not set — use generate_api_key tool or set the env var")
+        logger.warning("PANORAMA_API_KEY is not set — generate one out of band (see README, Step 0) and store it via `docker mcp secret set PANORAMA_API_KEY=...`")
     verify = os.environ.get("PANORAMA_VERIFY_SSL", "yes").strip().lower()
     if verify == "no":
         logger.info("SSL verification is DISABLED (PANORAMA_VERIFY_SSL=no)")

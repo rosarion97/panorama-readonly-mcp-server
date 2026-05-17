@@ -1,5 +1,8 @@
 .env
-.env.*
+.env.local
+.env.production
+.env.staging
+.env.development
 .claude/
 *.key
 *.pem
