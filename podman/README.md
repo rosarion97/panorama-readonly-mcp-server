@@ -338,10 +338,10 @@ async def my_new_tool(param: str, target_serial: str = "") -> str:
             target_serial,
         )
         result = root.find(".//result") or root
-        return f"✅ Result:\n{_xml_to_text(result)}"
+        return f"Result:\n{_xml_to_text(result)}"
     except Exception as e:
         logger.error(f"Error in my_new_tool: {e}")
-        return f"❌ Error: {str(e)}"
+        return f"Error: {str(e)}"
 ```
 
 2. Rebuild the image: `podman build -t panorama-readonly-mcp-server:latest .`

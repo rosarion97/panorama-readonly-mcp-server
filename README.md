@@ -272,7 +272,7 @@ This server enforces read-only access at **three layers**:
 async def my_new_tool(param: str, target_serial: str = "") -> str:
     """Single-line description of what this tool does."""
     if not param.strip():
-        return "❌ Error: param is required"
+        return "Error: param is required"
     try:
         root = await _panorama_request(
             {"type": "op", "cmd": "<show><my><command></command></my></show>"},
@@ -281,10 +281,10 @@ async def my_new_tool(param: str, target_serial: str = "") -> str:
         result = root.find(".//result")
         if result is None:
             result = root
-        return f"✅ Result:\n{_xml_to_text(result)}"
+        return f"Result:\n{_xml_to_text(result)}"
     except Exception as e:
         logger.error(f"Error in my_new_tool: {e}")
-        return f"❌ Error: {str(e)}"
+        return f"Error: {str(e)}"
 ```
 
 2. Rebuild the Docker image: `docker build -t panorama-readonly-mcp-server .`
